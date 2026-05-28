@@ -1,0 +1,17 @@
+# Ignorar el núcleo de WordPress
+/wp-admin/
+/wp-includes/
+/*.php
+!/wp-config-sample.php
+
+# Ignorar subidas de medios (imágenes/videos que saturan Git)
+/wp-content/uploads/
+/wp-content/blogs.dir/
+/wp-content/upgrade/
+/wp-content/backup-db/
+
+# Ignorar archivos del sistema y entornos
+.htaccess
+wp-config.php
+*.log
+.DS_Store
