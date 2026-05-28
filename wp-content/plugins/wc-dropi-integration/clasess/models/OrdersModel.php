@@ -240,6 +240,56 @@ class JPIODFW_OrdersModel
         // return $variation_data; // $variation_data will return only the data which can be used to store variation data
     }
     /**
+     * Resuelve la URL de la API de Dropi según el nombre de la tienda
+     */
+    private function getApiUrlByStoreName($store_name)
+    {
+        $parts = explode('-', $store_name);
+        $cc = isset($parts[1]) ? strtolower($parts[1]) : '';
+
+        $country_map = array(
+            'pe' => 'https://api.dropi.pe/integrations/',
+            'co' => 'https://api.dropi.co/integrations/',
+            'ec' => 'https://api.dropi.ec/integrations/',
+            'ar' => 'https://api.dropi.ar/integrations/',
+            'cl' => 'https://api.dropi.cl/integrations/',
+            'py' => 'https://api.dropi.com.py/integrations/',
+            'pa' => 'https://api.dropi.pa/integrations/',
+            'mx' => 'https://api.dropi.mx/integrations/',
+            've' => 'https://api.dropi.com.ve/integrations/',
+            'es' => 'https://api.dropi.com.es/integrations/',
+        );
+
+        return isset($country_map[$cc]) ? $country_map[$cc] : $this->constants->API_URL;
+    }
+
+    /**
+     * Resuelve la URL de la API de Dropi a partir de un token
+     */
+    private function getApiUrlByToken($token)
+    {
+        $token_data = $this->tokenModel->getTokenByToken($token);
+        if ($token_data && isset($token_data[0]) && isset($token_data[0]->store)) {
+            return $this->getApiUrlByStoreName($token_data[0]->store);
+        }
+        return $this->constants->API_URL;
+    }
+
+    /**
+     * Realiza wp_remote_post con fallback de sslverify
+     */
+    private function remote_post_with_fallback($endpoint, $args)
+    {
+        $args['sslverify'] = true;
+        $response = wp_remote_post($endpoint, $args);
+        if (is_wp_error($response)) {
+            $args['sslverify'] = false;
+            $response = wp_remote_post($endpoint, $args);
+        }
+        return $response;
+    }
+
+    /**
      * Creo una orden
      */
     public function save($order)
@@ -274,7 +324,10 @@ class JPIODFW_OrdersModel
                 // LOG ORDER TO CUSTOM "dropi-orders" LOG
                 // $logger->info(wc_print_r($makeProductsArray, true), array('source' => 'dropi-orders'));
 
-                $endpoint = $this->constants->API_URL . "orders/myorders";
+                // Usar URL dinámica según el token de la tienda
+                $api_url = $id_token ? $this->getApiUrlByToken($id_token) : $this->constants->API_URL;
+                $endpoint = $api_url . "orders/myorders";
+                $logger->info("dropi-orders: endpoint={$endpoint} multitoken={$is_multitoken}", array('source' => 'dropi-orders'));
 
                 $order_type = $this->constants->SIN_RECAUDO;
                 $paymentMethod = $order->get_payment_method();
@@ -338,11 +391,10 @@ class JPIODFW_OrdersModel
 
                     ),
                     'cookies' => array(),
-                    'sslverify' => true,
 
                 );
 
-                $response = wp_remote_post(
+                $response = $this->remote_post_with_fallback(
                     $endpoint,
                     $args
                 );
