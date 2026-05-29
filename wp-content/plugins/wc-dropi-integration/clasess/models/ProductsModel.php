@@ -889,15 +889,14 @@ class JPIODFW_ProductsModel
             $img_url = $store_name ? $this->getImgUrlByStoreName($store_name) : $this->constants->IMG_URL;
             $cdn_url = $store_name ? $this->getCdnUrlByStoreName($store_name) : 'https://d39ru7awumhhs2.cloudfront.net/';
 
-            if (sizeof($gallery) > 0) {
-                $count = 0;
+            $gallery_ids = array();
 
+            if (sizeof($gallery) > 0) {
                 foreach ($gallery as $img) {
-                    // Add Featured Image to Post
                     if (empty($img->urlS3)) {
-                        $image_url        = $img_url .  $img->url;
+                        $image_url = $img_url . $img->url;
                     } else {
-                        $image_url        = $cdn_url .  $img->urlS3;
+                        $image_url = $cdn_url . $img->urlS3;
                     }
 
                     $this->logger->info("dropi-image: store={$store_name} full={$image_url}", array('source' => 'dropi-products'));
@@ -938,7 +937,7 @@ class JPIODFW_ProductsModel
                         'post_title'     => sanitize_file_name($filename),
                         'post_content'   => '',
                         'post_status'    => 'inherit',
-                        'post_parent' => $post_id
+                        'post_parent'    => $post_id,
                     );
 
                     $attach_id = wp_insert_attachment($attachment, $file, $post_id);
@@ -949,11 +948,16 @@ class JPIODFW_ProductsModel
 
                     wp_update_attachment_metadata($attach_id, $attach_data);
 
-                    if ($count === 0) {
-                        set_post_thumbnail($post_id, $attach_id);
-                    }
+                    $gallery_ids[] = $attach_id;
+                }
+            }
 
-                    $count++;
+            if (!empty($gallery_ids)) {
+                set_post_thumbnail($post_id, $gallery_ids[0]);
+
+                if (count($gallery_ids) > 1) {
+                    $gallery_ids_rest = array_slice($gallery_ids, 1);
+                    update_post_meta($post_id, '_product_image_gallery', implode(',', $gallery_ids_rest));
                 }
             }
         } catch (Exception $e) {
